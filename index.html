@@ -89,6 +89,22 @@ select,input[type=number],input[type=file]{border:1px solid var(--line);border-r
 <button class="ok" id="exportAllBtn">Export KO+VI+EN SRT</button>
 <button class="primary" id="exportViKoEnBtn">Export VI+KO+EN SRT</button>
 </div>
+<div class="control" style="margin-top:12px">
+  <label>Cắt đoạn để đưa sang 561-ReadAloud <span class="pill">reset time về 0s</span></label>
+  <div class="row" style="margin-top:0">
+    <div><label class="meta">Từ dòng</label><input id="cutFromLine" type="number" min="1" step="1" value="1"></div>
+    <div><label class="meta">Đến dòng</label><input id="cutToLine" type="number" min="1" step="1" value="1"></div>
+  </div>
+  <div class="row">
+    <button id="setCutFromCurrentBtn">Lấy dòng hiện tại làm START</button>
+    <button id="setCutToCurrentBtn">Lấy dòng hiện tại làm END</button>
+  </div>
+  <div class="row">
+    <button class="primary" id="exportCutViKoEnResetBtn">Export đoạn VI+KO+EN · Time từ 0s</button>
+    <button class="warn" id="previewCutBtn">Xem thông tin đoạn cắt</button>
+  </div>
+  <div class="hint">Ví dụ cắt dòng 20–50: dòng 20 sẽ bắt đầu 00:00:00,000; các dòng sau tự trừ cùng một mốc thời gian.</div>
+</div>
 </div>
 <div class="card"><div style="font-weight:800;font-size:18px;margin-bottom:8px;">Editable timeline</div><div class="hint">TEXT mode: edit KO/VI/EN trực tiếp trong từng ô. TIMING mode: chỉnh Start/End theo giây 123.45s.</div><div class="segments" id="segments"></div></div>
 </div>
@@ -109,6 +125,7 @@ const $=id=>document.getElementById(id);
 const audio=$('audio'),audioFile=$('audioFile'),srtFile=$('srtFile'),viSrtFile=$('viSrtFile'),enSrtFile=$('enSrtFile'),translationPaste=$('translationPaste'),rawText=$('rawText'),segmentsEl=$('segments'),statusEl=$('status'),audioInfo=$('audioInfo'),audioMeta=$('audioMeta');
 const studyMode=$('studyMode'),fontSize=$('fontSize'),fontSizeValue=$('fontSizeValue'),playbackRate=$('playbackRate'),playbackRateValue=$('playbackRateValue'),shadowPause=$('shadowPause'),shadowPauseValue=$('shadowPauseValue'),loopStart=$('loopStart'),loopEnd=$('loopEnd');
 const timeline=$('timeline'),currentTimeText=$('currentTimeText'),durationText=$('durationText'),selectedLineText=$('selectedLineText');
+const cutFromLine=$('cutFromLine'),cutToLine=$('cutToLine');
 let rows=[],currentIndex=-1,shadowTimeout=null,isSeeking=false,editMode="TEXT";
 function setStatus(s){statusEl.textContent=s}
 function esc(s){return String(s||'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;')}
@@ -137,7 +154,7 @@ div.querySelector('.start').addEventListener('change',e=>{const v=parseFloat(e.t
 div.querySelector('.end').addEventListener('change',e=>{const v=parseFloat(e.target.value);rows[i].end=isNaN(v)?null:Math.max((rows[i].start??0)+0.05,v);renderRows();saveSettings()});
 div.querySelector('.play-one').addEventListener('click',()=>playLine(i));div.querySelector('.set-ab').addEventListener('click',()=>setABForLine(i));div.querySelector('.shift-back').addEventListener('click',()=>shiftLine(i,-0.2));div.querySelector('.shift-forward').addEventListener('click',()=>shiftLine(i,0.2));div.querySelector('.split-here').addEventListener('click',()=>splitRow(i));div.querySelector('.delete-line').addEventListener('click',()=>deleteRow(i));
 div.addEventListener('click',e=>{if(e.target.tagName==='BUTTON'||e.target.tagName==='INPUT'||e.target.classList.contains('edit-text')||e.target.classList.contains('edit-vi')||e.target.classList.contains('edit-en'))return;currentIndex=i;renderRows();scrollCurrentIntoView();updateTimeUI()});
-});updateTimeUI()}
+});updateCutInputs();updateTimeUI()}
 function scrollCurrentIntoView(){const el=document.querySelector(`.seg[data-index="${currentIndex}"]`);if(!el)return;const rect=el.getBoundingClientRect();window.scrollTo({top:Math.max(0,window.scrollY+rect.top-window.innerHeight*.28),behavior:'smooth'})}
 function shiftLine(i,d){rows[i].start=Math.max(0,+(rows[i].start+d).toFixed(2));rows[i].end=Math.max(rows[i].start+.05,+(rows[i].end+d).toFixed(2));renderRows();saveSettings()}
 function splitRow(i){const r=rows[i],mid=+((r.start+r.end)/2).toFixed(2),text=r.text||'',cut=Math.floor(text.length/2);rows.splice(i,1,{start:r.start,end:mid,text:text.slice(0,cut).trim()||text,vi:'',en:''},{start:mid,end:r.end,text:text.slice(cut).trim()||text,vi:'',en:''});currentIndex=i;renderRows();saveSettings()}
@@ -163,6 +180,7 @@ timeline.addEventListener('change',()=>{audio.currentTime=parseFloat(timeline.va
 function parseTimeToSec(s){const m=s.trim().match(/(\d+):(\d+):(\d+)[,.](\d+)/);if(!m)return 0;return parseInt(m[1])*3600+parseInt(m[2])*60+parseInt(m[3])+parseInt((m[4]+'000').slice(0,3))/1000}
 function secToSrt(t){t=Math.max(0,Number(t)||0);const h=Math.floor(t/3600),m=Math.floor((t%3600)/60),s=Math.floor(t%60),ms=Math.round((t-Math.floor(t))*1000);return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')},${String(ms).padStart(3,'0')}`}
 function importSrtText(text){const blocks=text.replace(/\r/g,'').trim().split(/\n\s*\n/),parsed=[];for(const block of blocks){const lines=block.split('\n').filter(Boolean),ti=lines.findIndex(l=>/-->/i.test(l));if(ti<0)continue;const times=lines[ti].split(/-->/),start=parseTimeToSec(times[0]),end=parseTimeToSec(times[1]),content=lines.slice(ti+1).join('\n').trim();if(content)parsed.push({start:+start.toFixed(2),end:+end.toFixed(2),text:content,vi:'',en:''})}rows=parsed;rawText.value=rows.map(r=>r.text).join('\n');currentIndex=rows.length?0:-1;editMode='TIMING';renderRows();saveSettings();setStatus(`Đã import ${rows.length} dòng từ SRT.`)}
+function updateCutInputs(){if(!cutFromLine||!cutToLine)return;cutFromLine.max=String(Math.max(rows.length,1));cutToLine.max=String(Math.max(rows.length,1));if(rows.length){if(!cutFromLine.value||Number(cutFromLine.value)<1)cutFromLine.value='1';if(!cutToLine.value||Number(cutToLine.value)<1)cutToLine.value=String(rows.length);if(Number(cutToLine.value)>rows.length)cutToLine.value=String(rows.length);}}
 function parseSrtOnly(text){const blocks=text.replace(/\r/g,'').trim().split(/\n\s*\n/),parsed=[];for(const block of blocks){const lines=block.split('\n').filter(Boolean),ti=lines.findIndex(l=>/-->/i.test(l));if(ti<0)continue;const times=lines[ti].split(/-->/),start=parseTimeToSec(times[0]),end=parseTimeToSec(times[1]),content=lines.slice(ti+1).join('\n').trim();if(content)parsed.push({start:+start.toFixed(2),end:+end.toFixed(2),text:content})}return parsed}
 function importTranslationSrt(text,lang){const parsed=parseSrtOnly(text);if(!rows.length){rows=parsed.map(r=>({start:r.start,end:r.end,text:'',vi:lang==='vi'?r.text:'',en:lang==='en'?r.text:''}));}else{parsed.forEach((r,i)=>{if(rows[i])rows[i][lang]=r.text});}currentIndex=rows.length?0:-1;renderRows();saveSettings();setStatus(`Đã gộp ${parsed.length} dòng ${lang.toUpperCase()} vào timeline.`)}
 function applyPastedTranslation(lang){if(!translationPaste.value.trim())return setStatus('Chưa có bản dịch để gắn.');const lines=translationPaste.value.replace(/\r/g,'').split('\n').map(x=>x.trim()).filter(Boolean);lines.forEach((line,i)=>{if(rows[i])rows[i][lang]=line});renderRows();saveSettings();setStatus(`Đã gắn ${lines.length} dòng vào cột ${lang.toUpperCase()}.`)}
@@ -175,6 +193,12 @@ function exportTri(){if(!rows.length)return setStatus('Chưa có dòng nào đ�
 
 function makeViKoEnSrtText(){syncFromDom();return rows.map((r,i)=>{const body=[r.vi||'',r.text||'',r.en||''].filter(Boolean).join('\n');return `${i+1}\n${secToSrt(r.start)} --> ${secToSrt(r.end)}\n${body}\n`}).join('\n')}
 function exportViKoEn(){if(!rows.length)return setStatus('Chưa có dòng nào để export.');syncFromDom();if(rows.some(r=>r.start==null||r.end==null))return setStatus('Có dòng chưa có Start/End.');downloadText('study_mode_vi_ko_en.srt',makeViKoEnSrtText());setStatus('Đã export study_mode_vi_ko_en.srt.')}
+function getCutRange(){syncFromDom();if(!rows.length){setStatus('Chưa có dòng nào để cắt.');return null;}let from=Math.floor(Number(cutFromLine?.value||1));let to=Math.floor(Number(cutToLine?.value||rows.length));from=Math.max(1,Math.min(rows.length,from));to=Math.max(1,Math.min(rows.length,to));if(to<from){const tmp=from;from=to;to=tmp;}return {from,to,items:rows.slice(from-1,to)};}
+function makeCutViKoEnResetSrtText(){const range=getCutRange();if(!range)return '';const base=Number(range.items[0]?.start||0);return range.items.map((r,i)=>{const st=Math.max(0,Number(r.start)-base);const en=Math.max(st+0.05,Number(r.end)-base);const body=[r.vi||'',r.text||'',r.en||''].filter(Boolean).join('\n');return `${i+1}\n${secToSrt(st)} --> ${secToSrt(en)}\n${body}\n`;}).join('\n');}
+function exportCutViKoEnReset(){const range=getCutRange();if(!range)return;if(range.items.some(r=>r.start==null||r.end==null))return setStatus('Đoạn chọn có dòng chưa có Start/End.');const content=makeCutViKoEnResetSrtText();const filename=`study_mode_cut_${range.from}-${range.to}_vi_ko_en_reset.srt`;downloadText(filename,content);const dur=(Number(range.items[range.items.length-1].end)-Number(range.items[0].start)).toFixed(2);setStatus(`Đã export ${filename}. Đoạn mới dài khoảng ${dur}s, bắt đầu từ 0.00s.`)}
+function previewCutInfo(){const range=getCutRange();if(!range)return;if(range.items.some(r=>r.start==null||r.end==null))return setStatus('Đoạn chọn có dòng chưa có Start/End.');const first=range.items[0],last=range.items[range.items.length-1];const dur=(Number(last.end)-Number(first.start)).toFixed(2);setStatus(`Đoạn dòng ${range.from}–${range.to}: gốc ${fmt(first.start)} → ${fmt(last.end)}; sau export sẽ thành 0.00s → ${dur}s.`)}
+function setCutFromCurrent(){if(currentIndex<0)return setStatus('Bạn chưa chọn dòng.');cutFromLine.value=String(currentIndex+1);setStatus(`START cắt = dòng ${currentIndex+1}.`)}
+function setCutToCurrent(){if(currentIndex<0)return setStatus('Bạn chưa chọn dòng.');cutToLine.value=String(currentIndex+1);setStatus(`END cắt = dòng ${currentIndex+1}.`)}
 
 function exportSrt(){if(!rows.length)return setStatus('Chưa có dòng nào để export.');syncFromDom();if(rows.some(r=>r.start==null||r.end==null))return setStatus('Có dòng chưa có Start/End. Hãy tạo timeline hoặc set time trước khi export.');const srt=rows.map((r,i)=>`${i+1}\n${secToSrt(r.start)} --> ${secToSrt(r.end)}\n${(r.text||'').trim()}\n`).join('\n');const blob=new Blob([srt],{type:'text/plain;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='study_mode_export.srt';document.body.appendChild(a);a.click();a.remove();setStatus('Đã export SRT.')}
 srtFile.addEventListener('change',()=>{const f=srtFile.files?.[0];if(!f)return;const reader=new FileReader();reader.onload=e=>importSrtText(String(e.target.result||''));reader.readAsText(f,'utf-8')});
@@ -182,6 +206,7 @@ viSrtFile.addEventListener('change',()=>{const f=viSrtFile.files?.[0];if(!f)retu
 enSrtFile.addEventListener('change',()=>{const f=enSrtFile.files?.[0];if(!f)return;const reader=new FileReader();reader.onload=e=>importTranslationSrt(String(e.target.result||''),'en');reader.readAsText(f,'utf-8')});
 $('applyViTextBtn').onclick=()=>applyPastedTranslation('vi');$('applyEnTextBtn').onclick=()=>applyPastedTranslation('en');
 $('exportKoBtn').onclick=()=>exportLang('text');$('exportViBtn').onclick=()=>exportLang('vi');$('exportEnBtn').onclick=()=>exportLang('en');$('exportBiBtn').onclick=()=>exportLang('text',true);$('exportAllBtn').onclick=exportTri;$('exportViKoEnBtn').onclick=exportViKoEn;
+$('exportCutViKoEnResetBtn').onclick=exportCutViKoEnReset;$('previewCutBtn').onclick=previewCutInfo;$('setCutFromCurrentBtn').onclick=setCutFromCurrent;$('setCutToCurrentBtn').onclick=setCutToCurrent;
 
 $('splitBtn').onclick=makeEstimatedRows;$('assignTimeBtn').onclick=assignEstimatedTime;$('modeBtn').onclick=toggleEditMode;$('playBtn').onclick=()=>{if(!audio.src)setStatus('Bạn chưa nạp MP3.');else audio.play().catch(()=>{})};$('pauseBtn').onclick=()=>{clearShadow();audio.pause();setStatus(`Đã pause tại ${fmt(audio.currentTime)}.`);updateTimeUI()};$('readFromHereBtn').onclick=playFromHere;$('prevLineBtn').onclick=prevLine;$('nextLineBtn').onclick=nextLine;$('stopBtn').onclick=stopPlayback;$('addLineBtn').onclick=addRow;$('exportSrtBtn').onclick=exportSrt;$('setStartBtn').onclick=setStartHere;$('setEndBtn').onclick=setEndHere;$('copyTimeBtn').onclick=copyTime;$('jumpStartBtn').onclick=jumpStart;$('jumpEndBtn').onclick=jumpEnd;$('setABHereBtn').onclick=()=>{if(currentIndex>=0)setABForLine(currentIndex)};
 $('clearBtn').onclick=()=>{clearShadow();audio.pause();audio.removeAttribute('src');audio.load();audioFile.value='';srtFile.value='';rawText.value='';rows=[];currentIndex=-1;editMode='TEXT';audioInfo.textContent='Chưa có file';audioMeta.textContent='Nạp mp3 để bắt đầu.';renderRows();saveSettings();updateTimeUI();setStatus('Đã xóa.')};
