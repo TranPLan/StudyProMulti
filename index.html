@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Study Mode Pro Full Translation</title>
+<title>Study Mode Pro Full Translation Editable Editable</title>
 <style>
 :root{--bg:#f5f7fb;--card:#fff;--text:#1f2937;--muted:#6b7280;--line:#e5e7eb;--primary:#2563eb;--shadow:0 10px 30px rgba(0,0,0,.08);--reader-size:17px;--highlight:#fff7cc;--active:#eff6ff}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -27,7 +27,13 @@ select,input[type=number],input[type=file]{border:1px solid var(--line);border-r
 .seg-head{display:grid;grid-template-columns:1fr;gap:8px;align-items:center;margin-bottom:8px}@media(min-width:760px){.seg-head{grid-template-columns:90px 1fr 1fr 110px 110px}}
 .meta{font-size:12px;color:var(--muted)}.time-input{font-size:14px;padding:8px 10px}
 .edit-text{min-height:46px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;line-height:1.6;background:#fff;font-size:var(--reader-size)}
-.edit-text.current{background:var(--highlight)}.mini-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}.mini-actions button{font-size:13px;padding:8px}
+.edit-text.current{background:var(--highlight)}
+.edit-vi,.edit-en{min-height:46px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;line-height:1.6;background:#fff;font-size:var(--reader-size);white-space:pre-wrap}
+.edit-vi:focus,.edit-en:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(37,99,235,.12);outline:none}
+.edit-vi:empty:before{content:"Nhập/sửa tiếng Việt...";color:#9ca3af}
+.edit-en:empty:before{content:"Type/edit English...";color:#9ca3af}
+.seg.editing{border-color:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.10)}
+.mini-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}.mini-actions button{font-size:13px;padding:8px}
 .sticky{position:sticky;top:0;z-index:10;padding-top:env(safe-area-inset-top);background:linear-gradient(to bottom,rgba(245,247,251,1),rgba(245,247,251,.85),rgba(245,247,251,0));backdrop-filter:saturate(180%) blur(12px)}
 .float{position:fixed;left:0;right:0;bottom:0;z-index:9999;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:linear-gradient(to top,rgba(245,247,251,.98),rgba(245,247,251,.94),rgba(245,247,251,0));backdrop-filter:saturate(180%) blur(16px)}
 .bar{max-width:1180px;margin:0 auto;background:#ffffffee;border:1px solid var(--line);box-shadow:var(--shadow);border-radius:18px;padding:10px}
@@ -80,9 +86,10 @@ select,input[type=number],input[type=file]{border:1px solid var(--line);border-r
 <button class="warn" id="exportViBtn">Export VI SRT</button>
 <button class="warn" id="exportEnBtn">Export EN SRT</button>
 <button class="ok" id="exportBiBtn">Export KO+VI SRT</button>
+<button class="ok" id="exportAllBtn">Export KO+VI+EN SRT</button>
 </div>
 </div>
-<div class="card"><div style="font-weight:800;font-size:18px;margin-bottom:8px;">Editable timeline</div><div class="hint">TEXT mode: edit chữ, không auto scroll. TIMING mode: chỉnh Start/End theo giây 123.45s.</div><div class="segments" id="segments"></div></div>
+<div class="card"><div style="font-weight:800;font-size:18px;margin-bottom:8px;">Editable timeline</div><div class="hint">TEXT mode: edit KO/VI/EN trực tiếp trong từng ô. TIMING mode: chỉnh Start/End theo giây 123.45s.</div><div class="segments" id="segments"></div></div>
 </div>
 
 <div class="float"><div class="bar">
@@ -106,6 +113,7 @@ function setStatus(s){statusEl.textContent=s}
 function esc(s){return String(s||'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;')}
 function fmt(t){t=Math.max(0,Number(t)||0);return t.toFixed(2)+'s'}
 function updateLabels(){fontSizeValue.textContent=fontSize.value+' px';playbackRateValue.textContent=Number(playbackRate.value).toFixed(2).replace(/\.00$/,'')+'x';shadowPauseValue.textContent=shadowPause.value+' ms';document.documentElement.style.setProperty('--reader-size',fontSize.value+'px');audio.playbackRate=parseFloat(playbackRate.value)}
+function isEditingSubtitle(){const el=document.activeElement;return !!el&&(el.classList?.contains('edit-text')||el.classList?.contains('edit-vi')||el.classList?.contains('edit-en'));}
 function updateTimeUI(){const dur=(audio.duration&&isFinite(audio.duration))?audio.duration:0,cur=audio.currentTime||0;currentTimeText.textContent=fmt(cur);durationText.textContent=fmt(dur);timeline.max=dur?dur.toFixed(2):0;if(!isSeeking)timeline.value=cur.toFixed(2);selectedLineText.textContent=(editMode+' · ')+(currentIndex>=0?`Dòng: ${currentIndex+1}`:'Dòng: —')}
 function saveSettings(){localStorage.setItem('editor_timeline_raw',rawText.value);localStorage.setItem('editor_timeline_rows',JSON.stringify(rows));localStorage.setItem('editor_timeline_mode',studyMode.value);localStorage.setItem('editor_timeline_font',fontSize.value);localStorage.setItem('editor_timeline_rate',playbackRate.value);localStorage.setItem('editor_timeline_shadow',shadowPause.value);localStorage.setItem('editor_timeline_loop_start',loopStart.value);localStorage.setItem('editor_timeline_loop_end',loopEnd.value);localStorage.setItem('editor_timeline_edit_mode',editMode)}
 function loadSettings(){rawText.value=localStorage.getItem('editor_timeline_raw')||'';try{rows=JSON.parse(localStorage.getItem('editor_timeline_rows')||'[]')}catch(e){rows=[]}studyMode.value=localStorage.getItem('editor_timeline_mode')||'normal';fontSize.value=localStorage.getItem('editor_timeline_font')||'17';playbackRate.value=localStorage.getItem('editor_timeline_rate')||'1';shadowPause.value=localStorage.getItem('editor_timeline_shadow')||'800';loopStart.value=localStorage.getItem('editor_timeline_loop_start')||'0';loopEnd.value=localStorage.getItem('editor_timeline_loop_end')||'5';editMode=localStorage.getItem('editor_timeline_edit_mode')||'TEXT';updateLabels()}
@@ -118,10 +126,16 @@ function renderRows(){segmentsEl.innerHTML='';if(!rows.length){segmentsEl.innerH
 div.querySelector('.edit-text').addEventListener('input',e=>{rows[i].text=e.currentTarget.innerText.trim();saveSettings()});
 div.querySelector('.edit-vi').addEventListener('input',e=>{rows[i].vi=e.currentTarget.innerText.trim();saveSettings()});
 div.querySelector('.edit-en').addEventListener('input',e=>{rows[i].en=e.currentTarget.innerText.trim();saveSettings()});
+['.edit-text','.edit-vi','.edit-en'].forEach(sel=>{
+  const box=div.querySelector(sel);
+  box.addEventListener('focus',()=>{div.classList.add('editing');currentIndex=i;updateTimeUI();});
+  box.addEventListener('blur',()=>{div.classList.remove('editing');syncFromDom();saveSettings();});
+});
+
 div.querySelector('.start').addEventListener('change',e=>{const v=parseFloat(e.target.value);rows[i].start=isNaN(v)?null:Math.max(0,v);if(rows[i].start!=null&&(rows[i].end==null||rows[i].end<rows[i].start))rows[i].end=+(rows[i].start+1).toFixed(2);renderRows();saveSettings()});
 div.querySelector('.end').addEventListener('change',e=>{const v=parseFloat(e.target.value);rows[i].end=isNaN(v)?null:Math.max((rows[i].start??0)+0.05,v);renderRows();saveSettings()});
 div.querySelector('.play-one').addEventListener('click',()=>playLine(i));div.querySelector('.set-ab').addEventListener('click',()=>setABForLine(i));div.querySelector('.shift-back').addEventListener('click',()=>shiftLine(i,-0.2));div.querySelector('.shift-forward').addEventListener('click',()=>shiftLine(i,0.2));div.querySelector('.split-here').addEventListener('click',()=>splitRow(i));div.querySelector('.delete-line').addEventListener('click',()=>deleteRow(i));
-div.addEventListener('click',e=>{if(e.target.tagName==='BUTTON'||e.target.tagName==='INPUT'||e.target.classList.contains('edit-text'))return;currentIndex=i;renderRows();scrollCurrentIntoView();updateTimeUI()});
+div.addEventListener('click',e=>{if(e.target.tagName==='BUTTON'||e.target.tagName==='INPUT'||e.target.classList.contains('edit-text')||e.target.classList.contains('edit-vi')||e.target.classList.contains('edit-en'))return;currentIndex=i;renderRows();scrollCurrentIntoView();updateTimeUI()});
 });updateTimeUI()}
 function scrollCurrentIntoView(){const el=document.querySelector(`.seg[data-index="${currentIndex}"]`);if(!el)return;const rect=el.getBoundingClientRect();window.scrollTo({top:Math.max(0,window.scrollY+rect.top-window.innerHeight*.28),behavior:'smooth'})}
 function shiftLine(i,d){rows[i].start=Math.max(0,+(rows[i].start+d).toFixed(2));rows[i].end=Math.max(rows[i].start+.05,+(rows[i].end+d).toFixed(2));renderRows();saveSettings()}
@@ -142,7 +156,7 @@ function jumpEnd(){if(currentIndex>=0&&rows[currentIndex]&&rows[currentIndex].en
 function copyTime(){const t=audio.currentTime.toFixed(2);navigator.clipboard?.writeText(t);setStatus(`Đã copy time: ${t}s`)}
 audioFile.addEventListener('change',()=>{const f=audioFile.files?.[0];if(!f)return;audio.src=URL.createObjectURL(f);audioInfo.textContent=f.name;audioMeta.textContent=`Đã nạp: ${f.name}`;setStatus('MP3 đã sẵn sàng.')});
 audio.addEventListener('loadedmetadata',()=>{audioMeta.textContent=`Thời lượng: ${audio.duration.toFixed(1)} giây`;timeline.max=audio.duration.toFixed(2);updateTimeUI()});
-audio.addEventListener('timeupdate',()=>{updateTimeUI();if(!rows.length||editMode!=='TIMING')return;const t=audio.currentTime;if(studyMode.value==='ab_loop'){const a=parseFloat(loopStart.value||'0'),b=parseFloat(loopEnd.value||'0');if(b>a&&t>=b){audio.currentTime=a;audio.play().catch(()=>{})}return}let idx=rows.findIndex(r=>r.start!=null&&r.end!=null&&t>=r.start&&t<r.end);if(idx>=0&&idx!==currentIndex){currentIndex=idx;renderRows();scrollCurrentIntoView()}if(currentIndex>=0&&rows[currentIndex]&&rows[currentIndex].end!=null&&t>=rows[currentIndex].end-.03){const mode=studyMode.value;if(mode==='normal'){if(currentIndex<rows.length-1)playLine(currentIndex+1);else audio.pause()}else if(mode==='line_repeat_2'||mode==='line_repeat_3'){const target=mode==='line_repeat_2'?2:3,count=Number(audio.dataset.repeatCount||'1');if(count<target){audio.dataset.repeatCount=String(count+1);audio.currentTime=rows[currentIndex].start}else{audio.dataset.repeatCount='1';if(currentIndex<rows.length-1)playLine(currentIndex+1);else audio.pause()}}else if(mode==='shadow_pause'){audio.pause();const rep=Number(audio.dataset.shadowRepeat||'0');if(rep===0){audio.dataset.shadowRepeat='1';shadowTimeout=setTimeout(()=>{if(!rows[currentIndex])return;audio.currentTime=rows[currentIndex].start;audio.play().catch(()=>{})},parseInt(shadowPause.value,10))}else{audio.dataset.shadowRepeat='0';if(currentIndex<rows.length-1)playLine(currentIndex+1)}}}});
+audio.addEventListener('timeupdate',()=>{updateTimeUI();if(!rows.length||editMode!=='TIMING')return;const t=audio.currentTime;if(studyMode.value==='ab_loop'){const a=parseFloat(loopStart.value||'0'),b=parseFloat(loopEnd.value||'0');if(b>a&&t>=b){audio.currentTime=a;audio.play().catch(()=>{})}return}let idx=rows.findIndex(r=>r.start!=null&&r.end!=null&&t>=r.start&&t<r.end);if(idx>=0&&idx!==currentIndex&&!isEditingSubtitle()){currentIndex=idx;renderRows();scrollCurrentIntoView()}if(currentIndex>=0&&rows[currentIndex]&&rows[currentIndex].end!=null&&t>=rows[currentIndex].end-.03){const mode=studyMode.value;if(mode==='normal'){if(currentIndex<rows.length-1)playLine(currentIndex+1);else audio.pause()}else if(mode==='line_repeat_2'||mode==='line_repeat_3'){const target=mode==='line_repeat_2'?2:3,count=Number(audio.dataset.repeatCount||'1');if(count<target){audio.dataset.repeatCount=String(count+1);audio.currentTime=rows[currentIndex].start}else{audio.dataset.repeatCount='1';if(currentIndex<rows.length-1)playLine(currentIndex+1);else audio.pause()}}else if(mode==='shadow_pause'){audio.pause();const rep=Number(audio.dataset.shadowRepeat||'0');if(rep===0){audio.dataset.shadowRepeat='1';shadowTimeout=setTimeout(()=>{if(!rows[currentIndex])return;audio.currentTime=rows[currentIndex].start;audio.play().catch(()=>{})},parseInt(shadowPause.value,10))}else{audio.dataset.shadowRepeat='0';if(currentIndex<rows.length-1)playLine(currentIndex+1)}}}});
 timeline.addEventListener('input',()=>{isSeeking=true;currentTimeText.textContent=fmt(parseFloat(timeline.value||0))});
 timeline.addEventListener('change',()=>{audio.currentTime=parseFloat(timeline.value||0);isSeeking=false;updateTimeUI()});
 function parseTimeToSec(s){const m=s.trim().match(/(\d+):(\d+):(\d+)[,.](\d+)/);if(!m)return 0;return parseInt(m[1])*3600+parseInt(m[2])*60+parseInt(m[3])+parseInt((m[4]+'000').slice(0,3))/1000}
@@ -155,12 +169,15 @@ function makeSrtText(lang='text',bilingual=false){syncFromDom();return rows.map(
 function downloadText(filename,content){const blob=new Blob([content],{type:'text/plain;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;document.body.appendChild(a);a.click();a.remove()}
 function exportLang(lang,bilingual=false){if(!rows.length)return setStatus('Chưa có dòng nào để export.');syncFromDom();if(rows.some(r=>r.start==null||r.end==null))return setStatus('Có dòng chưa có Start/End.');const name=bilingual?'study_mode_ko_vi.srt':`study_mode_${lang==='text'?'ko':lang}.srt`;downloadText(name,makeSrtText(lang,bilingual));setStatus(`Đã export ${name}.`)}
 
+function makeTriSrtText(){syncFromDom();return rows.map((r,i)=>{const body=[r.text||'',r.vi||'',r.en||''].filter(Boolean).join('\n');return `${i+1}\n${secToSrt(r.start)} --> ${secToSrt(r.end)}\n${body}\n`}).join('\n')}
+function exportTri(){if(!rows.length)return setStatus('Chưa có dòng nào để export.');syncFromDom();if(rows.some(r=>r.start==null||r.end==null))return setStatus('Có dòng chưa có Start/End.');downloadText('study_mode_ko_vi_en.srt',makeTriSrtText());setStatus('Đã export study_mode_ko_vi_en.srt.')}
+
 function exportSrt(){if(!rows.length)return setStatus('Chưa có dòng nào để export.');syncFromDom();if(rows.some(r=>r.start==null||r.end==null))return setStatus('Có dòng chưa có Start/End. Hãy tạo timeline hoặc set time trước khi export.');const srt=rows.map((r,i)=>`${i+1}\n${secToSrt(r.start)} --> ${secToSrt(r.end)}\n${(r.text||'').trim()}\n`).join('\n');const blob=new Blob([srt],{type:'text/plain;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='study_mode_export.srt';document.body.appendChild(a);a.click();a.remove();setStatus('Đã export SRT.')}
 srtFile.addEventListener('change',()=>{const f=srtFile.files?.[0];if(!f)return;const reader=new FileReader();reader.onload=e=>importSrtText(String(e.target.result||''));reader.readAsText(f,'utf-8')});
 viSrtFile.addEventListener('change',()=>{const f=viSrtFile.files?.[0];if(!f)return;const reader=new FileReader();reader.onload=e=>importTranslationSrt(String(e.target.result||''),'vi');reader.readAsText(f,'utf-8')});
 enSrtFile.addEventListener('change',()=>{const f=enSrtFile.files?.[0];if(!f)return;const reader=new FileReader();reader.onload=e=>importTranslationSrt(String(e.target.result||''),'en');reader.readAsText(f,'utf-8')});
 $('applyViTextBtn').onclick=()=>applyPastedTranslation('vi');$('applyEnTextBtn').onclick=()=>applyPastedTranslation('en');
-$('exportKoBtn').onclick=()=>exportLang('text');$('exportViBtn').onclick=()=>exportLang('vi');$('exportEnBtn').onclick=()=>exportLang('en');$('exportBiBtn').onclick=()=>exportLang('text',true);
+$('exportKoBtn').onclick=()=>exportLang('text');$('exportViBtn').onclick=()=>exportLang('vi');$('exportEnBtn').onclick=()=>exportLang('en');$('exportBiBtn').onclick=()=>exportLang('text',true);$('exportAllBtn').onclick=exportTri;
 
 $('splitBtn').onclick=makeEstimatedRows;$('assignTimeBtn').onclick=assignEstimatedTime;$('modeBtn').onclick=toggleEditMode;$('playBtn').onclick=()=>{if(!audio.src)setStatus('Bạn chưa nạp MP3.');else audio.play().catch(()=>{})};$('pauseBtn').onclick=()=>{clearShadow();audio.pause();setStatus(`Đã pause tại ${fmt(audio.currentTime)}.`);updateTimeUI()};$('readFromHereBtn').onclick=playFromHere;$('prevLineBtn').onclick=prevLine;$('nextLineBtn').onclick=nextLine;$('stopBtn').onclick=stopPlayback;$('addLineBtn').onclick=addRow;$('exportSrtBtn').onclick=exportSrt;$('setStartBtn').onclick=setStartHere;$('setEndBtn').onclick=setEndHere;$('copyTimeBtn').onclick=copyTime;$('jumpStartBtn').onclick=jumpStart;$('jumpEndBtn').onclick=jumpEnd;$('setABHereBtn').onclick=()=>{if(currentIndex>=0)setABForLine(currentIndex)};
 $('clearBtn').onclick=()=>{clearShadow();audio.pause();audio.removeAttribute('src');audio.load();audioFile.value='';srtFile.value='';rawText.value='';rows=[];currentIndex=-1;editMode='TEXT';audioInfo.textContent='Chưa có file';audioMeta.textContent='Nạp mp3 để bắt đầu.';renderRows();saveSettings();updateTimeUI();setStatus('Đã xóa.')};
