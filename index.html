@@ -87,6 +87,7 @@ select,input[type=number],input[type=file]{border:1px solid var(--line);border-r
 <button class="warn" id="exportEnBtn">Export EN SRT</button>
 <button class="ok" id="exportBiBtn">Export KO+VI SRT</button>
 <button class="ok" id="exportAllBtn">Export KO+VI+EN SRT</button>
+<button class="primary" id="exportViKoEnBtn">Export VI+KO+EN SRT</button>
 </div>
 </div>
 <div class="card"><div style="font-weight:800;font-size:18px;margin-bottom:8px;">Editable timeline</div><div class="hint">TEXT mode: edit KO/VI/EN trực tiếp trong từng ô. TIMING mode: chỉnh Start/End theo giây 123.45s.</div><div class="segments" id="segments"></div></div>
@@ -172,12 +173,15 @@ function exportLang(lang,bilingual=false){if(!rows.length)return setStatus('Chư
 function makeTriSrtText(){syncFromDom();return rows.map((r,i)=>{const body=[r.text||'',r.vi||'',r.en||''].filter(Boolean).join('\n');return `${i+1}\n${secToSrt(r.start)} --> ${secToSrt(r.end)}\n${body}\n`}).join('\n')}
 function exportTri(){if(!rows.length)return setStatus('Chưa có dòng nào để export.');syncFromDom();if(rows.some(r=>r.start==null||r.end==null))return setStatus('Có dòng chưa có Start/End.');downloadText('study_mode_ko_vi_en.srt',makeTriSrtText());setStatus('Đã export study_mode_ko_vi_en.srt.')}
 
+function makeViKoEnSrtText(){syncFromDom();return rows.map((r,i)=>{const body=[r.vi||'',r.text||'',r.en||''].filter(Boolean).join('\n');return `${i+1}\n${secToSrt(r.start)} --> ${secToSrt(r.end)}\n${body}\n`}).join('\n')}
+function exportViKoEn(){if(!rows.length)return setStatus('Chưa có dòng nào để export.');syncFromDom();if(rows.some(r=>r.start==null||r.end==null))return setStatus('Có dòng chưa có Start/End.');downloadText('study_mode_vi_ko_en.srt',makeViKoEnSrtText());setStatus('Đã export study_mode_vi_ko_en.srt.')}
+
 function exportSrt(){if(!rows.length)return setStatus('Chưa có dòng nào để export.');syncFromDom();if(rows.some(r=>r.start==null||r.end==null))return setStatus('Có dòng chưa có Start/End. Hãy tạo timeline hoặc set time trước khi export.');const srt=rows.map((r,i)=>`${i+1}\n${secToSrt(r.start)} --> ${secToSrt(r.end)}\n${(r.text||'').trim()}\n`).join('\n');const blob=new Blob([srt],{type:'text/plain;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='study_mode_export.srt';document.body.appendChild(a);a.click();a.remove();setStatus('Đã export SRT.')}
 srtFile.addEventListener('change',()=>{const f=srtFile.files?.[0];if(!f)return;const reader=new FileReader();reader.onload=e=>importSrtText(String(e.target.result||''));reader.readAsText(f,'utf-8')});
 viSrtFile.addEventListener('change',()=>{const f=viSrtFile.files?.[0];if(!f)return;const reader=new FileReader();reader.onload=e=>importTranslationSrt(String(e.target.result||''),'vi');reader.readAsText(f,'utf-8')});
 enSrtFile.addEventListener('change',()=>{const f=enSrtFile.files?.[0];if(!f)return;const reader=new FileReader();reader.onload=e=>importTranslationSrt(String(e.target.result||''),'en');reader.readAsText(f,'utf-8')});
 $('applyViTextBtn').onclick=()=>applyPastedTranslation('vi');$('applyEnTextBtn').onclick=()=>applyPastedTranslation('en');
-$('exportKoBtn').onclick=()=>exportLang('text');$('exportViBtn').onclick=()=>exportLang('vi');$('exportEnBtn').onclick=()=>exportLang('en');$('exportBiBtn').onclick=()=>exportLang('text',true);$('exportAllBtn').onclick=exportTri;
+$('exportKoBtn').onclick=()=>exportLang('text');$('exportViBtn').onclick=()=>exportLang('vi');$('exportEnBtn').onclick=()=>exportLang('en');$('exportBiBtn').onclick=()=>exportLang('text',true);$('exportAllBtn').onclick=exportTri;$('exportViKoEnBtn').onclick=exportViKoEn;
 
 $('splitBtn').onclick=makeEstimatedRows;$('assignTimeBtn').onclick=assignEstimatedTime;$('modeBtn').onclick=toggleEditMode;$('playBtn').onclick=()=>{if(!audio.src)setStatus('Bạn chưa nạp MP3.');else audio.play().catch(()=>{})};$('pauseBtn').onclick=()=>{clearShadow();audio.pause();setStatus(`Đã pause tại ${fmt(audio.currentTime)}.`);updateTimeUI()};$('readFromHereBtn').onclick=playFromHere;$('prevLineBtn').onclick=prevLine;$('nextLineBtn').onclick=nextLine;$('stopBtn').onclick=stopPlayback;$('addLineBtn').onclick=addRow;$('exportSrtBtn').onclick=exportSrt;$('setStartBtn').onclick=setStartHere;$('setEndBtn').onclick=setEndHere;$('copyTimeBtn').onclick=copyTime;$('jumpStartBtn').onclick=jumpStart;$('jumpEndBtn').onclick=jumpEnd;$('setABHereBtn').onclick=()=>{if(currentIndex>=0)setABForLine(currentIndex)};
 $('clearBtn').onclick=()=>{clearShadow();audio.pause();audio.removeAttribute('src');audio.load();audioFile.value='';srtFile.value='';rawText.value='';rows=[];currentIndex=-1;editMode='TEXT';audioInfo.textContent='Chưa có file';audioMeta.textContent='Nạp mp3 để bắt đầu.';renderRows();saveSettings();updateTimeUI();setStatus('Đã xóa.')};
