@@ -43,7 +43,7 @@ select,input[type=number],input[type=file]{border:1px solid var(--line);border-r
 .time-actions button{font-size:13px;padding:9px 8px}
 .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}@media(min-width:800px){.grid{grid-template-columns:repeat(12,1fr)}}.grid button{padding:10px 8px;font-size:14px}
 
-.trans-tools{display:grid;grid-template-columns:1fr;gap:12px}@media(min-width:950px){.trans-tools{grid-template-columns:1fr 1fr 1fr}}
+.trans-tools{display:grid;grid-template-columns:1fr;gap:12px}@media(min-width:950px){.trans-tools{grid-template-columns:1fr 1fr 1fr 1fr}}
 .translation-box{min-height:90px;font-size:15px;line-height:1.55}
 .lang-grid{display:grid;grid-template-columns:1fr;gap:8px;margin-top:8px}@media(min-width:900px){.lang-grid{grid-template-columns:1fr 1fr 1fr}}
 .lang-label{font-size:12px;font-weight:800;color:#4b5563;margin:0 0 4px 2px}
@@ -79,6 +79,7 @@ select,input[type=number],input[type=file]{border:1px solid var(--line);border-r
 <div class="hint">Cách dùng nhanh: import <b>ko.srt</b> trước → import thêm <b>vi.srt/en.srt</b> hoặc dán bản dịch từng dòng → học song ngữ ngay trong timeline. Bản HTML này không tự gọi AI dịch online; nó gộp bản dịch đã tạo sẵn vào đúng time. Nút KO/VI/EN ⬆⬇ chỉ gộp chữ của riêng ngôn ngữ đó, không xóa dòng và không đổi timeline.</div>
 <div class="trans-tools" style="margin-top:12px">
   <div class="control"><label>Import VI SRT <span class="pill">dịch Việt</span></label><input id="viSrtFile" type="file" accept=".srt,text/plain"><div class="hint">Chọn file .vi.srt, app sẽ gộp vào từng dòng theo thứ tự.</div></div>
+  <div class="control"><label>Import KO+VI SRT <span class="pill">auto tách VI</span></label><input id="koviSrtFile" type="file" accept=".srt,text/plain"><div class="hint">Chọn file có 2 dòng/block: KO rồi VI. App sẽ bỏ dòng KO và chỉ đưa tiếng Việt vào cột VI.</div></div>
   <div class="control"><label>Import EN SRT <span class="pill">English</span></label><input id="enSrtFile" type="file" accept=".srt,text/plain"><div class="hint">Chọn file .en.srt, app sẽ gộp vào từng dòng theo thứ tự.</div></div>
   <div class="control"><label>Paste translation <span class="pill">line by line</span></label><textarea id="translationPaste" class="translation-box" placeholder="Dán bản dịch ở đây, mỗi dòng ứng với 1 dòng subtitle..."></textarea><div class="row"><button id="applyViTextBtn">Gắn vào VI</button><button id="applyEnTextBtn">Gắn vào EN</button></div></div>
 </div>
@@ -123,7 +124,7 @@ select,input[type=number],input[type=file]{border:1px solid var(--line);border-r
 
 <script>
 const $=id=>document.getElementById(id);
-const audio=$('audio'),audioFile=$('audioFile'),srtFile=$('srtFile'),viSrtFile=$('viSrtFile'),enSrtFile=$('enSrtFile'),translationPaste=$('translationPaste'),rawText=$('rawText'),segmentsEl=$('segments'),statusEl=$('status'),audioInfo=$('audioInfo'),audioMeta=$('audioMeta');
+const audio=$('audio'),audioFile=$('audioFile'),srtFile=$('srtFile'),viSrtFile=$('viSrtFile'),koviSrtFile=$('koviSrtFile'),enSrtFile=$('enSrtFile'),translationPaste=$('translationPaste'),rawText=$('rawText'),segmentsEl=$('segments'),statusEl=$('status'),audioInfo=$('audioInfo'),audioMeta=$('audioMeta');
 const studyMode=$('studyMode'),fontSize=$('fontSize'),fontSizeValue=$('fontSizeValue'),playbackRate=$('playbackRate'),playbackRateValue=$('playbackRateValue'),shadowPause=$('shadowPause'),shadowPauseValue=$('shadowPauseValue'),loopStart=$('loopStart'),loopEnd=$('loopEnd');
 const timeline=$('timeline'),currentTimeText=$('currentTimeText'),durationText=$('durationText'),selectedLineText=$('selectedLineText');
 const cutFromLine=$('cutFromLine'),cutToLine=$('cutToLine');
@@ -224,6 +225,27 @@ function secToSrt(t){t=Math.max(0,Number(t)||0);const h=Math.floor(t/3600),m=Mat
 function importSrtText(text){const blocks=text.replace(/\r/g,'').trim().split(/\n\s*\n/),parsed=[];for(const block of blocks){const lines=block.split('\n').filter(Boolean),ti=lines.findIndex(l=>/-->/i.test(l));if(ti<0)continue;const times=lines[ti].split(/-->/),start=parseTimeToSec(times[0]),end=parseTimeToSec(times[1]),content=lines.slice(ti+1).join('\n').trim();if(content)parsed.push({start:+start.toFixed(2),end:+end.toFixed(2),text:content,vi:'',en:''})}rows=parsed;rawText.value=rows.map(r=>r.text).join('\n');currentIndex=rows.length?0:-1;editMode='TIMING';renderRows();saveSettings();setStatus(`Đã import ${rows.length} dòng từ SRT.`)}
 function updateCutInputs(){if(!cutFromLine||!cutToLine)return;cutFromLine.max=String(Math.max(rows.length,1));cutToLine.max=String(Math.max(rows.length,1));if(rows.length){if(!cutFromLine.value||Number(cutFromLine.value)<1)cutFromLine.value='1';if(!cutToLine.value||Number(cutToLine.value)<1)cutToLine.value=String(rows.length);if(Number(cutToLine.value)>rows.length)cutToLine.value=String(rows.length);}}
 function parseSrtOnly(text){const blocks=text.replace(/\r/g,'').trim().split(/\n\s*\n/),parsed=[];for(const block of blocks){const lines=block.split('\n').filter(Boolean),ti=lines.findIndex(l=>/-->/i.test(l));if(ti<0)continue;const times=lines[ti].split(/-->/),start=parseTimeToSec(times[0]),end=parseTimeToSec(times[1]),content=lines.slice(ti+1).join('\n').trim();if(content)parsed.push({start:+start.toFixed(2),end:+end.toFixed(2),text:content})}return parsed}
+function normCompareText(s){return String(s||'').toLowerCase().replace(/[\s\u200b]+/g,' ').replace(/[“”\"'‘’.,!?;:，。！？、…-]/g,'').trim()}
+function lineLooksSame(a,b){const x=normCompareText(a),y=normCompareText(b);if(!x||!y)return false;if(x===y)return true;if(x.length>12&&y.length>12&&(x.includes(y)||y.includes(x)))return true;return false}
+function extractViFromKoViBlock(koviText,koText){
+  const lines=String(koviText||'').replace(/\r/g,'').split('\n').map(x=>x.trim()).filter(Boolean);
+  if(!lines.length)return '';
+  const koLines=String(koText||'').replace(/\r/g,'').split('\n').map(x=>x.trim()).filter(Boolean);
+  const kept=lines.filter(line=>!koLines.some(ko=>lineLooksSame(line,ko)) && !lineLooksSame(line,koText));
+  if(kept.length)return kept.join('\n');
+  if(lines.length>=2)return lines.slice(1).join('\n');
+  return '';
+}
+function importKoViSrt(text){
+  const parsed=parseSrtOnly(text);
+  if(!parsed.length)return setStatus('File KO+VI không đọc được hoặc không có block SRT hợp lệ.');
+  if(!rows.length){
+    rows=parsed.map(r=>{const parts=String(r.text||'').split('\n').map(x=>x.trim()).filter(Boolean);return {start:r.start,end:r.end,text:parts[0]||'',vi:parts.slice(1).join('\n'),en:''}});
+  }else{
+    parsed.forEach((r,i)=>{if(rows[i])rows[i].vi=extractViFromKoViBlock(r.text,rows[i].text);});
+  }
+  currentIndex=rows.length?0:-1;editMode='TIMING';renderRows();saveSettings();setStatus(`Đã tách tiếng Việt từ ${parsed.length} block KO+VI vào cột VI.`);
+}
 function importTranslationSrt(text,lang){const parsed=parseSrtOnly(text);if(!rows.length){rows=parsed.map(r=>({start:r.start,end:r.end,text:'',vi:lang==='vi'?r.text:'',en:lang==='en'?r.text:''}));}else{parsed.forEach((r,i)=>{if(rows[i])rows[i][lang]=r.text});}currentIndex=rows.length?0:-1;renderRows();saveSettings();setStatus(`Đã gộp ${parsed.length} dòng ${lang.toUpperCase()} vào timeline.`)}
 function applyPastedTranslation(lang){if(!translationPaste.value.trim())return setStatus('Chưa có bản dịch để gắn.');const lines=translationPaste.value.replace(/\r/g,'').split('\n').map(x=>x.trim()).filter(Boolean);lines.forEach((line,i)=>{if(rows[i])rows[i][lang]=line});renderRows();saveSettings();setStatus(`Đã gắn ${lines.length} dòng vào cột ${lang.toUpperCase()}.`)}
 function makeSrtText(lang='text',bilingual=false){syncFromDom();return rows.map((r,i)=>{let body='';if(bilingual){body=[r.text||'',r.vi||''].filter(Boolean).join('\n')}else{body=(r[lang]||'').trim()}return `${i+1}\n${secToSrt(r.start)} --> ${secToSrt(r.end)}\n${body}\n`}).join('\n')}
@@ -245,14 +267,15 @@ function setCutToCurrent(){if(currentIndex<0)return setStatus('Bạn chưa chọ
 function exportSrt(){if(!rows.length)return setStatus('Chưa có dòng nào để export.');syncFromDom();if(rows.some(r=>r.start==null||r.end==null))return setStatus('Có dòng chưa có Start/End. Hãy tạo timeline hoặc set time trước khi export.');const srt=rows.map((r,i)=>`${i+1}\n${secToSrt(r.start)} --> ${secToSrt(r.end)}\n${(r.text||'').trim()}\n`).join('\n');const blob=new Blob([srt],{type:'text/plain;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='study_mode_export.srt';document.body.appendChild(a);a.click();a.remove();setStatus('Đã export SRT.')}
 srtFile.addEventListener('change',()=>{const f=srtFile.files?.[0];if(!f)return;const reader=new FileReader();reader.onload=e=>importSrtText(String(e.target.result||''));reader.readAsText(f,'utf-8')});
 viSrtFile.addEventListener('change',()=>{const f=viSrtFile.files?.[0];if(!f)return;const reader=new FileReader();reader.onload=e=>importTranslationSrt(String(e.target.result||''),'vi');reader.readAsText(f,'utf-8')});
+koviSrtFile.addEventListener('change',()=>{const f=koviSrtFile.files?.[0];if(!f)return;const reader=new FileReader();reader.onload=e=>importKoViSrt(String(e.target.result||''));reader.readAsText(f,'utf-8')});
 enSrtFile.addEventListener('change',()=>{const f=enSrtFile.files?.[0];if(!f)return;const reader=new FileReader();reader.onload=e=>importTranslationSrt(String(e.target.result||''),'en');reader.readAsText(f,'utf-8')});
 $('applyViTextBtn').onclick=()=>applyPastedTranslation('vi');$('applyEnTextBtn').onclick=()=>applyPastedTranslation('en');
 $('exportKoBtn').onclick=()=>exportLang('text');$('exportViBtn').onclick=()=>exportLang('vi');$('exportEnBtn').onclick=()=>exportLang('en');$('exportBiBtn').onclick=()=>exportLang('text',true);$('exportAllBtn').onclick=exportTri;$('exportViKoEnBtn').onclick=exportViKoEn;
 $('exportCutViKoEnResetBtn').onclick=exportCutViKoEnReset;$('previewCutBtn').onclick=previewCutInfo;$('setCutFromCurrentBtn').onclick=setCutFromCurrent;$('setCutToCurrentBtn').onclick=setCutToCurrent;
-$('mergePrevBtn').onclick=()=>{if(currentIndex>=0)mergeWithPrev(currentIndex);else setStatus('Bạn chưa chọn dòng để merge.')};$('mergeNextBtn').onclick=()=>{if(currentIndex>=0)mergeWithNext(currentIndex);else setStatus('Bạn chưa chọn dòng để merge.')};$('smartMergeBtn').onclick=smartMergeAll;$('smartMergeRangeBtn').onclick=smartMergeCut;
+if($('mergePrevBtn'))$('mergePrevBtn').onclick=()=>{if(currentIndex>=0)mergeWithPrev(currentIndex);else setStatus('Bạn chưa chọn dòng để merge.')};if($('mergeNextBtn'))$('mergeNextBtn').onclick=()=>{if(currentIndex>=0)mergeWithNext(currentIndex);else setStatus('Bạn chưa chọn dòng để merge.')};if($('smartMergeBtn'))$('smartMergeBtn').onclick=smartMergeAll;if($('smartMergeRangeBtn'))$('smartMergeRangeBtn').onclick=smartMergeCut;
 
 $('splitBtn').onclick=makeEstimatedRows;$('assignTimeBtn').onclick=assignEstimatedTime;$('modeBtn').onclick=toggleEditMode;$('playBtn').onclick=()=>{if(!audio.src)setStatus('Bạn chưa nạp MP3.');else audio.play().catch(()=>{})};$('pauseBtn').onclick=()=>{clearShadow();audio.pause();setStatus(`Đã pause tại ${fmt(audio.currentTime)}.`);updateTimeUI()};$('readFromHereBtn').onclick=playFromHere;$('prevLineBtn').onclick=prevLine;$('nextLineBtn').onclick=nextLine;$('stopBtn').onclick=stopPlayback;$('addLineBtn').onclick=addRow;$('exportSrtBtn').onclick=exportSrt;$('setStartBtn').onclick=setStartHere;$('setEndBtn').onclick=setEndHere;$('copyTimeBtn').onclick=copyTime;$('jumpStartBtn').onclick=jumpStart;$('jumpEndBtn').onclick=jumpEnd;$('setABHereBtn').onclick=()=>{if(currentIndex>=0)setABForLine(currentIndex)};
-$('clearBtn').onclick=()=>{clearShadow();audio.pause();audio.removeAttribute('src');audio.load();audioFile.value='';srtFile.value='';rawText.value='';rows=[];currentIndex=-1;editMode='TEXT';audioInfo.textContent='Chưa có file';audioMeta.textContent='Nạp mp3 để bắt đầu.';renderRows();saveSettings();updateTimeUI();setStatus('Đã xóa.')};
+$('clearBtn').onclick=()=>{clearShadow();audio.pause();audio.removeAttribute('src');audio.load();audioFile.value='';srtFile.value='';if(koviSrtFile)koviSrtFile.value='';rawText.value='';rows=[];currentIndex=-1;editMode='TEXT';audioInfo.textContent='Chưa có file';audioMeta.textContent='Nạp mp3 để bắt đầu.';renderRows();saveSettings();updateTimeUI();setStatus('Đã xóa.')};
 [studyMode,fontSize,playbackRate,shadowPause,loopStart,loopEnd].forEach(el=>{el.addEventListener('input',()=>{updateLabels();saveSettings()});el.addEventListener('change',()=>{updateLabels();saveSettings()})});rawText.addEventListener('input',saveSettings);
 loadSettings();renderRows();updateTimeUI();setStatus('Sẵn sàng.');
 </script>
